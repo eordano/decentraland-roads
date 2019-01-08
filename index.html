@@ -26,16 +26,25 @@ html, div, document, body {
     <body>
         <div id="container">
             <div id="textcontainer">
+                <p>Modify this JSON and press "enter" to re-draw the map on the right:
                 <textarea id="text" rows=30 cols=80> </textarea>
-                <div id="roads">
-                    Roads are <br /><textarea id="roadcontent" rows=30 cols=20></textarea>
-                </div>
             </div>
             <div id="image">
                 <img id="canvas" />
             </div>
         </div>
     <script type='application/javascript'>
+        function drawMap(coords) {
+            const north = coords.sort(function (a, b) { return b.y - a.y })[0].y
+            const south = coords.sort(function (a, b) { return a.y - b.y })[0].y
+            const west = coords.sort(function (a, b) { return a.x - b.x })[0].x
+            const east = coords.sort(function (a, b) { return b.x - a.x })[0].x
+            document.getElementById('canvas').src = 'https://api.decentraland.org/v1/map.png?center='
+                + Math.round((east + west) / 2) + ','
+                + Math.round((north + south) / 2)
+                + '&width=1000&height=1000&size=9'
+                + '&selected=' + coords.map(function (c) { return c.x + ',' + c.y }).join(';')
+        }
         fetch('genesis.json').then((res, err) => {
             return res.json()
         }).then((res, err) => {
@@ -57,20 +66,27 @@ html, div, document, body {
             var roadId = 'f77140f9-c7b4-4787-89c9-9fa0e219b079'
             var parcels = res.data.assets.parcels.filter(parcel => parcel.district_id === roadId)
             var coords = parcels.map(p => ({ x: p.x, y: p.y }))
-            var west_x = -150
-            var east_x = 150
-            var north_y = 150 
-            var south_y = -150
-            var selection = coords.filter(c => {
-                return c.x >= west_x && c.x <= east_x && c.y <= north_y && c.y >= south_y
-            }).filter(c => {
+            const select = {
+                west: -150,
+                east: 150,
+                north: 150,
+                south: -150
+            }
+            function parcelContaining(wens) {
+                return (coord) => coord.x >= wens.west && coord.x <= wens.east && coord.y <= wens.north && coord.y >= wens.south
+            }
+            var selection = coords.filter(parcelContaining(select))
+            .filter(c => {
                 for (let f of Object.values(saved)) {
-                    if (c.x >= f.west && c.x <= f.east && c.y <= f.north && c.y >= f.south)
+                    if (parcelContaining(f)(c))
                         return false
                 }
                 return true
             })
-            document.getElementById('roadcontent').innerHTML = JSON.stringify(selection, null, 2)
+
+            selection = coords.filter(parcelContaining(saved['north']))
+            document.getElementById('text').value = JSON.stringify(selection, null, 2)
+            drawMap(selection)
         })
         document.getElementById('text').addEventListener('keyup', function(ev) {
             if (ev.code === 'Enter') {
@@ -83,15 +99,7 @@ html, div, document, body {
                   alert('invalid json', text)
                   return
                 }
-                const north = coords.sort(function (a, b) { return b.y - a.y })[0].y
-                const south = coords.sort(function (a, b) { return a.y - b.y })[0].y
-                const west = coords.sort(function (a, b) { return a.x - b.x })[0].x
-                const east = coords.sort(function (a, b) { return b.x - a.x })[0].x
-                document.getElementById('canvas').src = 'https://api.decentraland.org/v1/map.png?center='
-                    + Math.round((east + west) / 2) + ','
-                    + Math.round((north + south) / 2)
-                    + '&width=1000&height=1000&size=9'
-                    + '&selected=' + coords.map(function (c) { return c.x + ',' + c.y }).join(';')
+                drawMap(coords)
             }
         })
     </script>
